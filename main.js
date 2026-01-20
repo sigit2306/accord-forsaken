@@ -12,7 +12,7 @@ class WorldScene extends Phaser.Scene {
       color: "#ffffff"
     }).setScrollFactor(0)
 
-    this.add.text(10, 24, "Chapter 14 Demo • v0.1.0", {
+    this.add.text(10, 26, "Chapter 14 Demo v0.1.1", {
       fontSize: "10px",
       color: "#888888"
     }).setScrollFactor(0)
@@ -24,6 +24,9 @@ class WorldScene extends Phaser.Scene {
 
     this.prevX = this.player.x
     this.prevY = this.player.y
+
+    /* ---------------- RESPAWN ---------------- */
+    this.respawnPoint = { x: 180, y: 1000 }
 
     /* ---------------- CAMERA ---------------- */
     this.cameras.main.setBounds(0, 0, 360, 1200)
@@ -45,9 +48,23 @@ class WorldScene extends Phaser.Scene {
     this.physics.add.existing(this.rust, true)
     this.rustTerrain.add(this.rust)
 
+    /* ---------------- SHRINE ---------------- */
+    this.shrine = this.add.rectangle(180, 1050, 28, 28, 0x66ccff)
+    this.physics.add.existing(this.shrine, true)
+
+    this.add.text(140, 1070, "Shrine", {
+      fontSize: "10px",
+      color: "#66ccff"
+    })
+
     /* ---------------- COLLISION ---------------- */
     this.physics.add.collider(this.player, this.safeTerrain)
     this.rustCollider = this.physics.add.collider(this.player, this.rustTerrain)
+
+    this.physics.add.overlap(this.player, this.shrine, () => {
+      this.respawnPoint.x = this.shrine.x
+      this.respawnPoint.y = this.shrine.y - 40
+    })
 
     /* ---------------- INPUT ---------------- */
     this.cursors = this.input.keyboard.createCursorKeys()
@@ -60,13 +77,14 @@ class WorldScene extends Phaser.Scene {
     this.isSilent = false
     this.isKnockedback = false
     this.knockbackTimer = 0
+    this.isDead = false
+    this.isRespawning = false
 
     this.silence = 100
     this.maxSilence = 100
 
     this.hp = 100
     this.maxHp = 100
-    this.isDead = false
 
     /* ---------------- HUD ---------------- */
     this.silenceBarBg = this.add.rectangle(180, 620, 200, 10, 0x333333)
@@ -86,6 +104,12 @@ class WorldScene extends Phaser.Scene {
       color: "#ff8888"
     }).setScrollFactor(0)
 
+    /* ---------------- DEATH UI ---------------- */
+    this.deathText = this.add.text(180, 320, "YOU FELL SILENT", {
+      fontSize: "20px",
+      color: "#ffffff"
+    }).setOrigin(0.5).setAlpha(0)
+
     /* ---------------- OVERLAP ---------------- */
     this.physics.add.overlap(
       this.player,
@@ -96,14 +120,12 @@ class WorldScene extends Phaser.Scene {
     )
   }
 
-  /* ================= RUST ================= */
-
   onRustOverlap(player, rust) {
     this.inRust = true
 
-    if (!this.isSilent && !this.isKnockedback) {
+    if (!this.isSilent && !this.isKnockedback && !this.isDead) {
       this.applyDirectionalKnockback(player, rust)
-      this.applyDamage(8)
+      this.hp -= 15
     }
   }
 
@@ -111,61 +133,53 @@ class WorldScene extends Phaser.Scene {
     this.isKnockedback = true
     this.knockbackTimer = 220
 
-    const rustBounds = rust.getBounds()
-    const px = this.prevX
-    const py = this.prevY
-
-    let vx = 0
-    let vy = 0
+    const bounds = rust.getBounds()
     const power = 260
+    let vx = 0, vy = 0
 
-    if (py < rustBounds.top) {
-      player.y = rustBounds.top - player.height / 2 - 1
-      vy = -power
-    } else if (py > rustBounds.bottom) {
-      player.y = rustBounds.bottom + player.height / 2 + 1
-      vy = power
-    } else if (px < rustBounds.left) {
-      player.x = rustBounds.left - player.width / 2 - 1
-      vx = -power
-    } else if (px > rustBounds.right) {
-      player.x = rustBounds.right + player.width / 2 + 1
-      vx = power
-    } else {
-      vy = power
-    }
+    if (this.prevY < bounds.top) vy = -power
+    else if (this.prevY > bounds.bottom) vy = power
+    else if (this.prevX < bounds.left) vx = -power
+    else if (this.prevX > bounds.right) vx = power
+    else vy = power
 
     player.body.setVelocity(vx, vy)
 
-    this.cameras.main.shake(100, 0.01)
-    this.rust.setFillStyle(0xaa5533)
+    this.cameras.main.shake(120, 0.01)
+  }
 
-    this.time.delayedCall(120, () => {
-      this.rust.setFillStyle(0x8b4513)
+  triggerDeath() {
+    this.isDead = true
+    this.player.body.setVelocity(0)
+    this.cameras.main.fadeOut(800, 0, 0, 0)
+
+    this.time.delayedCall(600, () => {
+      this.deathText.setAlpha(1)
+    })
+
+    this.time.delayedCall(1800, () => {
+      this.respawn()
     })
   }
 
-  applyDamage(amount) {
-    if (this.isDead) return
+  respawn() {
+    this.isRespawning = true
+    this.deathText.setAlpha(0)
 
-    this.hp -= amount
-    this.hp = Phaser.Math.Clamp(this.hp, 0, this.maxHp)
+    this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
+    this.hp = this.maxHp
+    this.silence = this.maxSilence * 0.5
 
-    if (this.hp <= 0) {
-      this.onDeath()
-    }
+    this.cameras.main.fadeIn(800, 0, 0, 0)
+
+    this.time.delayedCall(600, () => {
+      this.isDead = false
+      this.isRespawning = false
+    })
   }
-
-  onDeath() {
-    this.isDead = true
-    this.player.body.setVelocity(0)
-    this.player.setFillStyle(0x555555)
-  }
-
-  /* ================= UPDATE ================= */
 
   update(time, delta) {
-    if (this.isDead) return
+    if (this.isDead || this.isRespawning) return
 
     const body = this.player.body
     const speed = 120
@@ -174,16 +188,12 @@ class WorldScene extends Phaser.Scene {
     this.prevX = this.player.x
     this.prevY = this.player.y
 
-    /* ---------- KNOCKBACK ---------- */
     if (this.isKnockedback) {
       this.knockbackTimer -= delta
-      if (this.knockbackTimer <= 0) {
-        this.isKnockedback = false
-      }
+      if (this.knockbackTimer <= 0) this.isKnockedback = false
       return
     }
 
-    /* ---------- INPUT ---------- */
     body.setVelocity(0)
 
     if (this.cursors.left.isDown) body.setVelocityX(-speed)
@@ -192,40 +202,36 @@ class WorldScene extends Phaser.Scene {
     if (this.cursors.up.isDown) body.setVelocityY(-speed)
     else if (this.cursors.down.isDown) body.setVelocityY(speed)
 
-    /* ---------- SILENCE ---------- */
     this.isSilent = this.silenceKey.isDown && this.silence > 0
     this.rustCollider.active = !this.isSilent
 
-    if (this.isSilent) {
-      this.silence -= 30 * (delta / 1000)
-    } else {
-      this.silence += 20 * (delta / 1000)
-    }
+    if (this.isSilent) this.silence -= 30 * (delta / 1000)
+    else this.silence += 20 * (delta / 1000)
 
-    if (this.silence <= 0) {
-      this.applyDamage(10 * (delta / 1000))
-    }
+    if (this.silence <= 0) this.hp -= 20 * (delta / 1000)
 
     this.silence = Phaser.Math.Clamp(this.silence, 0, this.maxSilence)
+    this.hp = Phaser.Math.Clamp(this.hp, 0, this.maxHp)
 
-    /* ---------- HUD ---------- */
-    const ratio = this.silence / this.maxSilence
-    this.silenceBar.width = 200 * ratio
+    this.silenceBar.width = 200 * (this.silence / this.maxSilence)
 
     this.silenceText.setText(`Silence: ${Math.ceil(this.silence)}`)
     this.hpText.setText(`Vitality: ${Math.ceil(this.hp)}`)
 
-    /* ---------- DISTORTION ---------- */
     if (this.inRust && this.isSilent) {
       this.player.scaleX = 0.9 + Math.sin(time * 0.02) * 0.05
       this.player.scaleY = 1.1
     } else {
       this.player.setScale(1)
     }
+
+    if (this.hp <= 0 && !this.isDead) {
+      this.triggerDeath()
+    }
   }
 }
 
-/* ================= CONFIG ================= */
+/* ---------------- CONFIG ---------------- */
 
 const config = {
   type: Phaser.AUTO,
@@ -234,9 +240,7 @@ const config = {
   backgroundColor: '#111',
   physics: {
     default: 'arcade',
-    arcade: {
-      debug: false
-    }
+    arcade: { debug: false }
   },
   scene: WorldScene
 }
