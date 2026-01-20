@@ -120,6 +120,8 @@ class WorldScene extends Phaser.Scene {
     )
   }
 
+  /* ================= RUST ================= */
+
   onRustOverlap(player, rust) {
     this.inRust = true
 
@@ -144,25 +146,32 @@ class WorldScene extends Phaser.Scene {
     else vy = power
 
     player.body.setVelocity(vx, vy)
-
     this.cameras.main.shake(120, 0.01)
   }
 
+  /* ================= DEATH / RESPAWN ================= */
+
   triggerDeath() {
+    if (this.isDead) return
+    this.enterDeath()
+  }
+
+  enterDeath() {
     this.isDead = true
     this.player.body.setVelocity(0)
+
     this.cameras.main.fadeOut(800, 0, 0, 0)
 
-    this.time.delayedCall(600, () => {
+    this.time.delayedCall(300, () => {
       this.deathText.setAlpha(1)
     })
 
-    this.time.delayedCall(1800, () => {
-      this.respawn()
+    this.time.delayedCall(3600, () => {
+      this.enterRespawn()
     })
   }
 
-  respawn() {
+  enterRespawn() {
     this.isRespawning = true
     this.deathText.setAlpha(0)
 
@@ -177,6 +186,8 @@ class WorldScene extends Phaser.Scene {
       this.isRespawning = false
     })
   }
+
+  /* ================= UPDATE ================= */
 
   update(time, delta) {
     if (this.isDead || this.isRespawning) return
@@ -225,7 +236,7 @@ class WorldScene extends Phaser.Scene {
       this.player.setScale(1)
     }
 
-    if (this.hp <= 0 && !this.isDead) {
+    if (this.hp <= 0) {
       this.triggerDeath()
     }
   }
