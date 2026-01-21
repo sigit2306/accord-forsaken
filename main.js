@@ -8,8 +8,9 @@ class WorldScene extends Phaser.Scene {
     this.load.image('shrine', 'assets/shrine.png')
     this.load.image('tiles', 'assets/tiles.png')
 
-    // 🎵 BGM
+    // 🎵 Audio
     this.load.audio('bgm', 'assets/Chapter-14-adv.mp3')
+    this.load.audio('endBgm', 'assets/Chapter-14-end.mp3')
   }
 
   create() {
@@ -46,10 +47,8 @@ Hold SPACE to pass in silence.`,
     ).setOrigin(0.5).setScrollFactor(0)
 
     /* ---------------- AUDIO ---------------- */
-    this.bgm = this.sound.add('bgm', {
-      loop: true,
-      volume: 0
-    })
+    this.bgm = this.sound.add('bgm', { loop: true, volume: 0 })
+    this.endBgm = this.sound.add('endBgm', { loop: false, volume: 0 })
 
     /* ---------------- TILEMAP ---------------- */
     const width = 23
@@ -60,11 +59,9 @@ Hold SPACE to pass in silence.`,
       const row = []
       for (let x = 0; x < width; x++) {
         let tile = 0
-
         if (y === 18 && x >= 4 && x <= 7) tile = 1
-        if (y >= 25 && y <= 40) tile = 2   // THICK RUST BRIDGE
+        if (y >= 25 && y <= 40) tile = 2 // RUST BAND
         if (y === 50 && x >= 14 && x <= 17) tile = 1
-
         row.push(tile)
       }
       data.push(row)
@@ -78,7 +75,6 @@ Hold SPACE to pass in silence.`,
 
     const tileset = this.map.addTilesetImage('tiles')
     this.groundLayer = this.map.createLayer(0, tileset, 0, 0)
-
     this.groundLayer.setCollision([1, 2])
 
     this.groundLayer.forEachTile(tile => {
@@ -88,11 +84,9 @@ Hold SPACE to pass in silence.`,
     /* ---------------- PLAYER ---------------- */
     this.player = this.physics.add.sprite(180, 1000, 'player')
     this.player.setCollideWorldBounds(true)
-
-    this.prevY = this.player.y
     this.physics.add.collider(this.player, this.groundLayer)
 
-    /* ---------------- RESPAWN ---------------- */
+    this.prevY = this.player.y
     this.respawnPoint = { x: 180, y: 1000 }
 
     /* ---------------- SHRINE ---------------- */
@@ -125,6 +119,7 @@ Hold SPACE to pass in silence.`,
     this.knockbackTimer = 0
     this.isDead = false
     this.isRespawning = false
+    this.hasEnded = false
 
     this.silence = 100
     this.maxSilence = 100
@@ -157,19 +152,12 @@ Hold SPACE to pass in silence.`,
   }
 
   update(time, delta) {
-    /* ---------- INTRO LOCK ---------- */
+    /* ---------- INTRO ---------- */
     if (this.isIntro) {
       if (this.silenceKey.isDown && !this.introDismissed) {
         this.introDismissed = true
-
-        // ▶️ Start BGM (browser-safe)
         this.bgm.play()
-        this.tweens.add({
-          targets: this.bgm,
-          volume: 0.6,
-          duration: 2000
-        })
-
+        this.tweens.add({ targets: this.bgm, volume: 0.6, duration: 2000 })
         this.tweens.add({
           targets: this.introText,
           alpha: 0,
@@ -183,11 +171,10 @@ Hold SPACE to pass in silence.`,
       return
     }
 
-    if (this.isDead || this.isRespawning) return
+    if (this.isDead || this.isRespawning || this.hasEnded) return
 
     const body = this.player.body
     const speed = 120
-
     this.prevY = this.player.y
 
     if (this.isKnockedback) {
@@ -200,93 +187,101 @@ Hold SPACE to pass in silence.`,
 
     if (this.cursors.left.isDown) body.setVelocityX(-speed)
     else if (this.cursors.right.isDown) body.setVelocityX(speed)
-
     if (this.cursors.up.isDown) body.setVelocityY(-speed)
     else if (this.cursors.down.isDown) body.setVelocityY(speed)
 
     /* ---------------- SILENCE ---------------- */
     this.isSilent = this.silenceKey.isDown && this.silence > 0
-
     if (this.isSilent) this.silence -= 30 * delta / 1000
     else this.silence += 20 * delta / 1000
-
     if (this.silence <= 0) this.hp -= 20 * delta / 1000
 
     this.silence = Phaser.Math.Clamp(this.silence, 0, this.maxSilence)
     this.hp = Phaser.Math.Clamp(this.hp, 0, this.maxHp)
 
     this.silenceBar.width = 200 * (this.silence / this.maxSilence)
-
     this.silenceText.setText(`Silence: ${Math.ceil(this.silence)}`)
     this.hpText.setText(`Vitality: ${Math.ceil(this.hp)}`)
 
-    /* ---------- RUST COLLISION TOGGLE ---------- */
+    /* ---------- RUST TOGGLE ---------- */
     if (this.isSilent !== this.wasSilent) {
       this.groundLayer.forEachTile(tile => {
-        if (tile.properties.isRust) {
-          tile.setCollision(!this.isSilent)
-        }
+        if (tile.properties.isRust) tile.setCollision(!this.isSilent)
       })
       this.wasSilent = this.isSilent
     }
 
     /* ---------- RUST DAMAGE ---------- */
-    const tile = this.groundLayer.getTileAtWorldXY(
-      this.player.x,
-      this.player.y
-    )
-
+    const tile = this.groundLayer.getTileAtWorldXY(this.player.x, this.player.y)
     if (tile && tile.index === 2 && !this.isSilent && !this.isKnockedback) {
       this.isKnockedback = true
       this.knockbackTimer = 220
       this.hp -= 15
-
       body.setVelocityY(this.prevY < tile.pixelY ? -260 : 260)
       this.cameras.main.shake(120, 0.01)
     }
 
-    if (this.hp <= 0 && !this.isDead) {
-      this.triggerDeath()
-    }
+    if (this.hp <= 0 && !this.isDead) this.triggerDeath()
+
+    /* ---------- END TRIGGER ---------- */
+    if (this.player.y < 50) this.triggerEnding()
+  }
+
+  triggerEnding() {
+    this.hasEnded = true
+    this.player.body.setVelocity(0)
+
+    this.tweens.add({ targets: this.bgm, volume: 0, duration: 1500 })
+    this.cameras.main.fadeOut(2000, 0, 0, 0)
+
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.bgm.stop()
+      this.endBgm.play()
+      this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 })
+
+      const credits = this.add.text(180, 320,
+`Chapter 14 Complete
+
+Developed with Phaser.js
+Assisted by ChatGPT AI
+Additional tools: GIMP
+
+Thank you for reading.`,
+        {
+          fontSize: "12px",
+          color: "#cccccc",
+          align: "center",
+          wordWrap: { width: 300 }
+        }
+      ).setOrigin(0.5).setScrollFactor(0).setAlpha(0)
+
+      this.cameras.main.fadeIn(2000, 0, 0, 0)
+
+      this.tweens.add({
+        targets: credits,
+        alpha: 1,
+        duration: 2000,
+        delay: 600
+      })
+    })
   }
 
   triggerDeath() {
     this.isDead = true
     this.player.body.setVelocity(0)
-
-    this.tweens.add({
-      targets: this.bgm,
-      volume: 0,
-      duration: 800
-    })
-
     this.cameras.main.fadeOut(800, 0, 0, 0)
-
-    this.time.delayedCall(300, () => {
-      this.deathText.setAlpha(1)
-    })
-
-    this.time.delayedCall(3600, () => {
-      this.respawn()
-    })
+    this.time.delayedCall(300, () => this.deathText.setAlpha(1))
+    this.time.delayedCall(3600, () => this.respawn())
   }
 
   respawn() {
     this.isRespawning = true
     this.deathText.setAlpha(0)
-
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.hp = this.maxHp
     this.silence = this.maxSilence * 0.5
-
     this.cameras.main.fadeIn(800, 0, 0, 0)
-
-    this.tweens.add({
-      targets: this.bgm,
-      volume: 0.6,
-      duration: 1500
-    })
-
+    this.tweens.add({ targets: this.bgm, volume: 0.6, duration: 1500 })
     this.time.delayedCall(600, () => {
       this.isDead = false
       this.isRespawning = false
