@@ -23,6 +23,25 @@ class WorldScene extends Phaser.Scene {
       color: "#888888"
     }).setScrollFactor(0)
 
+    /* ---------------- INTRO ---------------- */
+    this.isIntro = true
+    this.introDismissed = false
+
+    this.introText = this.add.text(180, 320,
+`Chapter 14 — The Rust That Remembers
+
+The bridge does not collapse.
+It waits.
+
+Hold SPACE to pass in silence.`,
+      {
+        fontSize: "12px",
+        color: "#cccccc",
+        align: "center",
+        wordWrap: { width: 300 }
+      }
+    ).setOrigin(0.5).setScrollFactor(0)
+
     /* ---------------- TILEMAP ---------------- */
     const width = 23
     const height = 75
@@ -34,7 +53,7 @@ class WorldScene extends Phaser.Scene {
         let tile = 0
 
         if (y === 18 && x >= 4 && x <= 7) tile = 1
-        if (y === 31) tile = 2
+        if (y >= 25 && y <= 40) tile = 2   // THICK RUST BRIDGE
         if (y === 50 && x >= 14 && x <= 17) tile = 1
 
         row.push(tile)
@@ -51,21 +70,17 @@ class WorldScene extends Phaser.Scene {
     const tileset = this.map.addTilesetImage('tiles')
     this.groundLayer = this.map.createLayer(0, tileset, 0, 0)
 
-    // Normal collisions
     this.groundLayer.setCollision([1, 2])
 
-    // Tag rust tiles once
+    // Mark rust tiles
     this.groundLayer.forEachTile(tile => {
-      if (tile.index === 2) {
-        tile.properties.isRust = true
-      }
+      if (tile.index === 2) tile.properties.isRust = true
     })
 
     /* ---------------- PLAYER ---------------- */
     this.player = this.physics.add.sprite(180, 1000, 'player')
     this.player.setCollideWorldBounds(true)
 
-    this.prevX = this.player.x
     this.prevY = this.player.y
 
     this.physics.add.collider(this.player, this.groundLayer)
@@ -134,15 +149,30 @@ class WorldScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0)
   }
 
-  /* ================= UPDATE ================= */
-
   update(time, delta) {
+    /* ---------- INTRO LOCK ---------- */
+    if (this.isIntro) {
+      if (this.silenceKey.isDown && !this.introDismissed) {
+        this.introDismissed = true
+
+        this.tweens.add({
+          targets: this.introText,
+          alpha: 0,
+          duration: 600,
+          onComplete: () => {
+            this.introText.destroy()
+            this.isIntro = false
+          }
+        })
+      }
+      return
+    }
+
     if (this.isDead || this.isRespawning) return
 
     const body = this.player.body
     const speed = 120
 
-    this.prevX = this.player.x
     this.prevY = this.player.y
 
     if (this.isKnockedback) {
@@ -175,7 +205,7 @@ class WorldScene extends Phaser.Scene {
     this.silenceText.setText(`Silence: ${Math.ceil(this.silence)}`)
     this.hpText.setText(`Vitality: ${Math.ceil(this.hp)}`)
 
-    /* ---------------- RUST COLLISION TOGGLE ---------------- */
+    /* ---------- RUST COLLISION TOGGLE ---------- */
     if (this.isSilent !== this.wasSilent) {
       this.groundLayer.forEachTile(tile => {
         if (tile.properties.isRust) {
@@ -185,7 +215,7 @@ class WorldScene extends Phaser.Scene {
       this.wasSilent = this.isSilent
     }
 
-    /* ---------------- RUST DAMAGE / KNOCKBACK ---------------- */
+    /* ---------- RUST DAMAGE ---------- */
     const tile = this.groundLayer.getTileAtWorldXY(
       this.player.x,
       this.player.y
@@ -196,9 +226,7 @@ class WorldScene extends Phaser.Scene {
       this.knockbackTimer = 220
       this.hp -= 15
 
-      const power = 260
-      body.setVelocity(0, this.prevY < tile.pixelY ? -power : power)
-
+      body.setVelocityY(this.prevY < tile.pixelY ? -260 : 260)
       this.cameras.main.shake(120, 0.01)
     }
 
