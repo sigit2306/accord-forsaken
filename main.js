@@ -7,6 +7,9 @@ class WorldScene extends Phaser.Scene {
     this.load.image('player', 'assets/player.png')
     this.load.image('shrine', 'assets/shrine.png')
     this.load.image('tiles', 'assets/tiles.png')
+
+    // 🎵 BGM
+    this.load.audio('bgm', 'assets/Chapter-14-adv.mp3')
   }
 
   create() {
@@ -42,6 +45,12 @@ Hold SPACE to pass in silence.`,
       }
     ).setOrigin(0.5).setScrollFactor(0)
 
+    /* ---------------- AUDIO ---------------- */
+    this.bgm = this.sound.add('bgm', {
+      loop: true,
+      volume: 0
+    })
+
     /* ---------------- TILEMAP ---------------- */
     const width = 23
     const height = 75
@@ -72,7 +81,6 @@ Hold SPACE to pass in silence.`,
 
     this.groundLayer.setCollision([1, 2])
 
-    // Mark rust tiles
     this.groundLayer.forEachTile(tile => {
       if (tile.index === 2) tile.properties.isRust = true
     })
@@ -82,7 +90,6 @@ Hold SPACE to pass in silence.`,
     this.player.setCollideWorldBounds(true)
 
     this.prevY = this.player.y
-
     this.physics.add.collider(this.player, this.groundLayer)
 
     /* ---------------- RESPAWN ---------------- */
@@ -154,6 +161,14 @@ Hold SPACE to pass in silence.`,
     if (this.isIntro) {
       if (this.silenceKey.isDown && !this.introDismissed) {
         this.introDismissed = true
+
+        // ▶️ Start BGM (browser-safe)
+        this.bgm.play()
+        this.tweens.add({
+          targets: this.bgm,
+          volume: 0.6,
+          duration: 2000
+        })
 
         this.tweens.add({
           targets: this.introText,
@@ -239,6 +254,12 @@ Hold SPACE to pass in silence.`,
     this.isDead = true
     this.player.body.setVelocity(0)
 
+    this.tweens.add({
+      targets: this.bgm,
+      volume: 0,
+      duration: 800
+    })
+
     this.cameras.main.fadeOut(800, 0, 0, 0)
 
     this.time.delayedCall(300, () => {
@@ -259,6 +280,12 @@ Hold SPACE to pass in silence.`,
     this.silence = this.maxSilence * 0.5
 
     this.cameras.main.fadeIn(800, 0, 0, 0)
+
+    this.tweens.add({
+      targets: this.bgm,
+      volume: 0.6,
+      duration: 1500
+    })
 
     this.time.delayedCall(600, () => {
       this.isDead = false
