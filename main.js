@@ -18,7 +18,7 @@ class WorldScene extends Phaser.Scene {
 
     // Version & Title Text
     this.add.text(10, 10, "THE ACCORD OF THE FORSAKEN WORLD", { fontSize: "12px", color: "#ffffff" }).setScrollFactor(0).setDepth(10)
-    this.add.text(10, 26, "Chapter 14 Demo v0.2.4", { fontSize: "10px", color: "#888888" }).setScrollFactor(0).setDepth(10)
+    this.add.text(10, 26, "Chapter 14 Demo v0.2.6", { fontSize: "10px", color: "#888888" }).setScrollFactor(0).setDepth(10)
 
     /* ---------------- INTRO ---------------- */
     this.isIntro = true
@@ -42,13 +42,13 @@ class WorldScene extends Phaser.Scene {
       const row = []
       for (let x = 0; x < width; x++) {
         let tile = 0 
-        if (y >= 65) tile = 1 // Bottom Stone
+        if (y >= 65) tile = 1 // Starting Stone Landing
         else if (y >= 20 && y < 65) {
-          if (x === 8 || x === 14) tile = 3 // Guardrail
-          else if (x >= 9 && x <= 13) tile = 2 // Rust
-          else tile = 0 // Void
+          if (x === 8 || x === 14) tile = 3 // Guardrail Walls
+          else if (x >= 9 && x <= 13) tile = 2 // Rust Bridge
+          else tile = 0 // Void/Chasm
         } 
-        else if (y < 20 && y > 10) tile = 1 // Top Stone
+        else if (y < 20) tile = 1 // Final Goal Stone Landing
         row.push(tile)
       }
       data.push(row)
@@ -58,7 +58,6 @@ class WorldScene extends Phaser.Scene {
     const tileset = this.map.addTilesetImage('tiles')
     this.groundLayer = this.map.createLayer(0, tileset, 0, 0)
     
-    // LOCKDOWN: Tile 0 (Void) and Tile 3 (Guardrail) block movement
     this.groundLayer.setCollision([0, 3]) 
     this.groundLayer.forEachTile(tile => { if (tile.index === 2) tile.properties.isRust = true })
 
@@ -73,11 +72,10 @@ class WorldScene extends Phaser.Scene {
     /* ---------------- PLAYER ---------------- */
     this.player = this.physics.add.sprite(180, 1100, 'player').setDepth(5)
     this.player.setCollideWorldBounds(true)
-    this.player.body.setSize(10, 10).setOffset(3, 3); // Slim Hitbox
+    this.player.body.setSize(10, 10).setOffset(3, 3);
     this.physics.add.collider(this.player, this.groundLayer)
     this.respawnPoint = { x: 180, y: 1100 }
 
-    // PULSATING INDICATOR
     this.pulseCircle = this.add.circle(0, 0, 24, 0x88ccff, 0.4).setVisible(false);
     this.tweens.add({ targets: this.pulseCircle, scale: 1.6, alpha: 0, duration: 1000, repeat: -1 });
 
@@ -113,14 +111,11 @@ class WorldScene extends Phaser.Scene {
     this.isSilent = false; this.isKnockedback = false; this.knockbackTimer = 0;
     this.hp = 100; this.silence = 100; this.maxSilence = 100; this.stepsTaken = 0;
     this.nextEncounter = Phaser.Math.Between(3000, 6000);
+    this.hasEnded = false;
   }
 
   update(time, delta) {
-    // 1. PRIORITY DEATH CHECK
-    if (this.hp <= 0 && !this.isDead) {
-      this.triggerDeath();
-      return;
-    }
+    if (this.hp <= 0 && !this.isDead) { this.triggerDeath(); return; }
 
     if (this.isIntro) {
       if ((this.silenceKey.isDown || this.input.activePointer.isDown)) {
@@ -138,7 +133,6 @@ class WorldScene extends Phaser.Scene {
       return 
     }
 
-    // 2. MOVEMENT
     let speed = 120; body.setVelocity(0);
     if (this.cursors.left.isDown) body.setVelocityX(-speed)
     else if (this.cursors.right.isDown) body.setVelocityX(speed)
@@ -146,16 +140,10 @@ class WorldScene extends Phaser.Scene {
     else if (this.cursors.down.isDown) body.setVelocityY(speed)
     if (this.inputState.isDragging) { body.setVelocity(this.inputState.moveVector.x * speed, this.inputState.moveVector.y * speed); }
 
-    // 3. REBALANCED SILENCE (Slower drain, faster recovery)
     const requestSilence = this.silenceKey.isDown || this.inputState.toggleSilence;
     this.isSilent = requestSilence && this.silence > 0
-    if (this.isSilent) {
-        this.silence -= 18 * delta / 1000; // Drains slower than before
-    } else {
-        this.silence += 30 * delta / 1000; // Refills faster on stone
-    }
+    if (this.isSilent) this.silence -= 18 * delta / 1000; else this.silence += 30 * delta / 1000;
     
-    // Encounter Logic (Only when moving & loud)
     if (body.speed > 0 && !this.isSilent) {
         this.stepsTaken += delta;
         if (this.stepsTaken >= this.nextEncounter) { this.triggerAlert(); this.stepsTaken = 0; this.nextEncounter = Phaser.Math.Between(4000, 8000); }
@@ -167,7 +155,6 @@ class WorldScene extends Phaser.Scene {
     this.silenceText.setText(`Silence: ${Math.ceil(this.silence)}`);
     this.hpText.setText(`Vitality: ${Math.ceil(this.hp)}`);
 
-    // 4. IMPROVED RUST CHECK (Constant drain vs Instant Knockback)
     const tile = this.groundLayer.getTileAtWorldXY(this.player.x, this.player.y)
     if (tile && tile.properties.isRust) {
         if (this.isSilent) {
@@ -175,7 +162,6 @@ class WorldScene extends Phaser.Scene {
             this.pulseCircle.setVisible(true);
             this.player.setTint(0x88ccff); 
         } else {
-            // Drains vitality smoothly when loud on rust, prevents getting "stuck"
             this.hp -= 12 * delta / 1000; 
             this.player.setTint(0xff0000);
             this.pulseCircle.setVisible(false);
@@ -186,7 +172,9 @@ class WorldScene extends Phaser.Scene {
         if (!this.isKnockedback) this.player.setTint(0xffffff);
     }
 
-    if (this.player.y < 150) this.triggerEnding();
+    if (this.player.y < 150 && !this.hasEnded) {
+        this.triggerEnding();
+    }
   }
 
   triggerAlert() {
@@ -198,21 +186,51 @@ class WorldScene extends Phaser.Scene {
     this.player.body.setVelocity(0);
     this.player.setTint(0x330000); 
     this.cameras.main.fadeOut(1000, 0, 0, 0);
-    
     this.tweens.add({ targets: this.deathText, alpha: 1, duration: 500 });
-
     this.time.delayedCall(3000, () => {
-        this.isDead = false;
-        this.hp = 100;
-        this.silence = 100;
+        this.isDead = false; this.hp = 100; this.silence = 100;
         this.scene.restart();
     });
   }
 
   triggerEnding() {
-    this.hasEnded = true; this.player.body.setVelocity(0);
-    this.add.rectangle(180, 600, 360, 1200, 0x000000).setAlpha(0.8).setDepth(100);
-    this.add.text(180, 320, "THE RUST REMEMBERS", { fontSize: "20px" }).setOrigin(0.5).setDepth(101).setScrollFactor(0);
+    this.hasEnded = true;
+    this.player.body.setVelocity(0);
+    
+    if (this.bgm) this.tweens.add({ targets: this.bgm, volume: 0, duration: 1500 });
+
+    // 1. Create a black overlay instead of using camera fade for the credits
+    // This allows the text to be visible because the camera technically isn't "blacked out"
+    const overlay = this.add.rectangle(180, 320, 360, 640, 0x000000)
+        .setScrollFactor(0)
+        .setDepth(100)
+        .setAlpha(0);
+
+    // 2. Fade in the manual overlay
+    this.tweens.add({
+        targets: overlay,
+        alpha: 1,
+        duration: 2000,
+        onComplete: () => {
+            if (this.bgm) this.bgm.stop();
+            if (this.endBgm) {
+                this.endBgm.play();
+                this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 });
+            }
+
+            // 3. Display Credit Text on top of the overlay
+            const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [Git Version v0.2.6]";
+            const credits = this.add.text(180, 320, creditText, {
+                fontSize: "16px",
+                color: "#ffffff",
+                align: "center",
+                wordWrap: { width: 300 }
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setAlpha(0);
+
+            // Fade the text in separately
+            this.tweens.add({ targets: credits, alpha: 1, duration: 1500 });
+        }
+    });
   }
 }
 
