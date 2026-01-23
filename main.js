@@ -18,7 +18,11 @@ class WorldScene extends Phaser.Scene {
 
     // Version & Title Text
     this.add.text(10, 10, "THE ACCORD OF THE FORSAKEN WORLD", { fontSize: "12px", color: "#ffffff" }).setScrollFactor(0).setDepth(10)
-    this.add.text(10, 26, "Chapter 14 Demo v0.2.6", { fontSize: "10px", color: "#888888" }).setScrollFactor(0).setDepth(10)
+    this.add.text(10, 26, "Chapter 14 Demo v0.2.7", { fontSize: "10px", color: "#888888" }).setScrollFactor(0).setDepth(10)
+
+    /* ---------------- INITIAL FADE IN ---------------- */
+    const startFade = this.add.rectangle(180, 320, 360, 640, 0x000000).setScrollFactor(0).setDepth(1000);
+    this.tweens.add({ targets: startFade, alpha: 0, duration: 2000 });
 
     /* ---------------- INTRO ---------------- */
     this.isIntro = true
@@ -199,14 +203,9 @@ class WorldScene extends Phaser.Scene {
     
     if (this.bgm) this.tweens.add({ targets: this.bgm, volume: 0, duration: 1500 });
 
-    // 1. Create a black overlay instead of using camera fade for the credits
-    // This allows the text to be visible because the camera technically isn't "blacked out"
     const overlay = this.add.rectangle(180, 320, 360, 640, 0x000000)
-        .setScrollFactor(0)
-        .setDepth(100)
-        .setAlpha(0);
+        .setScrollFactor(0).setDepth(100).setAlpha(0);
 
-    // 2. Fade in the manual overlay
     this.tweens.add({
         targets: overlay,
         alpha: 1,
@@ -218,17 +217,24 @@ class WorldScene extends Phaser.Scene {
                 this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 });
             }
 
-            // 3. Display Credit Text on top of the overlay
-            const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [Git Version v0.2.6]";
-            const credits = this.add.text(180, 320, creditText, {
-                fontSize: "16px",
-                color: "#ffffff",
-                align: "center",
-                wordWrap: { width: 300 }
+            const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [v0.2.7]";
+            const credits = this.add.text(180, 280, creditText, {
+                fontSize: "16px", color: "#ffffff", align: "center", wordWrap: { width: 300 }
             }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setAlpha(0);
 
-            // Fade the text in separately
-            this.tweens.add({ targets: credits, alpha: 1, duration: 1500 });
+            // RESTART BUTTON
+            const btnBg = this.add.rectangle(180, 420, 120, 40, 0x333333).setOrigin(0.5).setScrollFactor(0).setDepth(101).setAlpha(0).setInteractive({ useHandCursor: true });
+            const btnText = this.add.text(180, 420, "RESTART", { fontSize: "14px", color: "#88ccff" }).setOrigin(0.5).setScrollFactor(0).setDepth(102).setAlpha(0);
+
+            this.tweens.add({ targets: [credits, btnBg, btnText], alpha: 1, duration: 1000 });
+
+            // Button Hover & Click Logic
+            btnBg.on('pointerover', () => { btnBg.setFillStyle(0x444444); btnText.setTint(0xffffff); });
+            btnBg.on('pointerout', () => { btnBg.setFillStyle(0x333333); btnText.clearTint(); });
+            btnBg.on('pointerdown', () => {
+                this.sound.stopAll();
+                this.scene.restart();
+            });
         }
     });
   }
