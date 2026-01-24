@@ -254,7 +254,7 @@ class WorldScene extends Phaser.Scene {
         onComplete: () => {
             if (this.bgm) this.bgm.stop();
             if (this.endBgm) { this.endBgm.play(); this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 }); }
-            const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [v0.2.9c] by 3go";
+            const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [v0.2.9] by 3go\nMusic Copyright/Attribution:\nIn game music: Jan125\nCredit page: RandomMind";
             this.add.text(180, 280, creditText, { fontSize: "16px", color: "#ffffff", align: "center", wordWrap: { width: 300 } }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
             const btnBg = this.add.rectangle(180, 420, 120, 40, 0x333333).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
             this.add.text(180, 420, "RESTART", { fontSize: "14px", color: "#88ccff" }).setOrigin(0.5).setScrollFactor(0).setDepth(102);
