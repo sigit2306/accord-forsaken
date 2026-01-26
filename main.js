@@ -35,7 +35,6 @@ class WorldScene extends Phaser.Scene {
 
     /* ---------------- GLOBAL COUNTER (PATCHED) ---------------- */
     this.globalTravelers = "...";
-    // FIX: Using trailing slash and mode:cors to bypass 301/CORS issues
     const counterURL = "https://api.counterapi.dev/v1/accord_forsaken/global_v029/";
     
     fetch(counterURL, { mode: 'cors' })
@@ -98,12 +97,12 @@ class WorldScene extends Phaser.Scene {
 
     /* ---------------- HUD & UI ---------------- */
     this.hpText = this.add.text(10, 585, "Vitality", { fontSize: "10px", color: "#ff8888" }).setScrollFactor(0).setDepth(10);
-    
-    // RESTORED: Silence text label label
     this.silenceText = this.add.text(10, 605, "Silence", { fontSize: "10px", color: "#88ccff" }).setScrollFactor(0).setDepth(10);
-    
     this.silenceBar = this.add.rectangle(80, 620, 200, 10, 0x88ccff).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10);
     this.deathText = this.add.text(180, 320, "THE RUST CONSUMED YOU", { fontSize: "20px", color: "#ffffff" }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(20);
+
+    /* ---------------- MOBILE CONTROLS ---------------- */
+    this.setupMobileControls();
 
     /* ---------------- INITIAL STATE ---------------- */
     this.isIntro = true;
@@ -119,15 +118,107 @@ class WorldScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
   }
 
+  setupMobileControls() {
+    // Mobile touch controls for movement
+    this.touchMoving = false;
+    this.touchX = 0;
+    this.touchY = 0;
+    
+    // Silence button (right side) - TOGGLE MODE
+    const silenceBtn = this.add.circle(320, 560, 30, 0x88ccff, 0.3)
+      .setScrollFactor(0)
+      .setDepth(15)
+      .setInteractive();
+    
+    this.silenceBtnText = this.add.text(320, 560, "S", { fontSize: "20px", color: "#ffffff", fontStyle: "bold" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(16);
+
+    this.isTouchSilent = false;
+    
+    // Toggle on/off with single tap
+    silenceBtn.on('pointerdown', () => {
+      this.isTouchSilent = !this.isTouchSilent;
+      if (this.isTouchSilent) {
+        silenceBtn.setAlpha(0.6);
+        silenceBtn.setFillStyle(0x88ccff, 0.6);
+      } else {
+        silenceBtn.setAlpha(0.3);
+        silenceBtn.setFillStyle(0x88ccff, 0.3);
+      }
+    });
+
+    // Movement zone (left side of screen)
+    const moveZone = this.add.zone(90, 560, 180, 120)
+      .setScrollFactor(0)
+      .setInteractive();
+    
+    // Visual indicator for movement zone
+    const moveCircle = this.add.circle(90, 560, 40, 0xffffff, 0.1)
+      .setScrollFactor(0)
+      .setDepth(15);
+    
+    const moveText = this.add.text(90, 560, "↑↓←→", { fontSize: "16px", color: "#666666" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(16);
+
+    moveZone.on('pointerdown', (pointer) => {
+      this.touchMoving = true;
+      this.touchX = pointer.x;
+      this.touchY = pointer.y;
+    });
+    
+    moveZone.on('pointermove', (pointer) => {
+      if (this.touchMoving) {
+        this.touchX = pointer.x;
+        this.touchY = pointer.y;
+      }
+    });
+    
+    moveZone.on('pointerup', () => {
+      this.touchMoving = false;
+    });
+    
+    moveZone.on('pointerout', () => {
+      this.touchMoving = false;
+    });
+    
+    // Group all mobile controls and hide during intro
+    this.mobileControlsGroup = this.add.container(0, 0).setScrollFactor(0).setDepth(15);
+    this.mobileControlsGroup.add([silenceBtn, this.silenceBtnText, moveZone, moveCircle, moveText]);
+    this.mobileControlsGroup.setVisible(false);
+  }
+
   setupDifficultyMenu() {
-    this.menuGroup = this.add.container(180, 320).setScrollFactor(0).setDepth(200);
-    const title = this.add.text(0, -120, "SELECT YOUR ACCORD", { fontSize: "18px", color: "#ffffff", fontStyle: "bold" }).setOrigin(0.5);
-    const hint = this.add.text(0, 150, "Click or press ENTER to start", { fontSize: "10px", color: "#666666" }).setOrigin(0.5);
+    const menuBg = this.add.rectangle(180, 320, 360, 640, 0x000000, 0.85)
+      .setScrollFactor(0)
+      .setDepth(200);
     
-    // FIXED: Brighter color for the counter text visibility
-    this.counterText = this.add.text(0, 180, `Previous Souls: ${this.globalTravelers}`, { fontSize: "11px", color: "#bbbbbb", fontStyle: "italic" }).setOrigin(0.5);
+    const title = this.add.text(180, 200, "SELECT YOUR ACCORD", { 
+      fontSize: "18px", 
+      color: "#ffffff", 
+      fontStyle: "bold" 
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
     
-    this.previewBox = this.add.text(0, 85, "", { fontSize: "11px", color: "#88ccff", align: "center", wordWrap: { width: 260 } }).setOrigin(0.5);
+    const hint = this.add.text(180, 470, "Click or press ENTER to start", { 
+      fontSize: "10px", 
+      color: "#666666" 
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    
+    this.counterText = this.add.text(180, 500, `Previous Souls: ${this.globalTravelers}`, { 
+      fontSize: "11px", 
+      color: "#bbbbbb", 
+      fontStyle: "italic" 
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    
+    this.previewBox = this.add.text(180, 405, "", { 
+      fontSize: "11px", 
+      color: "#88ccff", 
+      align: "center", 
+      wordWrap: { width: 260 } 
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
     const options = [
         { label: 'THE CROSSING (EASY)', locked: false, desc: "Traverse the bridge through silence.\nRecommended for first-time explorers." },
@@ -136,23 +227,37 @@ class WorldScene extends Phaser.Scene {
     ];
 
     this.menuButtons = [];
+    this.menuElements = [menuBg, title, hint, this.counterText, this.previewBox];
     this.selectedMenuIndex = 0;
 
-    options.forEach((opt, i) => {
-        const yPos = -40 + (i * 45);
+    options.forEach((opt, index) => {
+        const yPos = 280 + (index * 45);
         const color = opt.locked ? "#444444" : "#ffffff";
-        const btnBg = this.add.rectangle(0, yPos, 220, 35, 0x222222, 0.8).setInteractive({ useHandCursor: !opt.locked });
-        const btnText = this.add.text(0, yPos, opt.label, { fontSize: "12px", color: color }).setOrigin(0.5);
+        
+        const btnBg = this.add.rectangle(180, yPos, 220, 35, 0x222222, 0.8)
+          .setScrollFactor(0)
+          .setDepth(201);
+        
+        const btnText = this.add.text(180, yPos, opt.label, { 
+          fontSize: "12px", 
+          color: color 
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+        
         this.menuButtons.push({ bg: btnBg, text: btnText, locked: opt.locked, desc: opt.desc });
-
+        this.menuElements.push(btnBg, btnText);
+        
         if (!opt.locked) {
-            btnBg.on('pointerover', () => { this.selectedMenuIndex = i; this.updateMenuSelection(); });
-            btnBg.on('pointerdown', () => { this.startGame(); });
+            btnBg.setInteractive({ useHandCursor: true });
+            btnBg.on('pointerover', () => { 
+                this.selectedMenuIndex = index; 
+                this.updateMenuSelection(); 
+            });
+            btnBg.on('pointerdown', () => { 
+                this.startGame(); 
+            });
         }
-        this.menuGroup.add([btnBg, btnText]);
     });
 
-    this.menuGroup.add([title, hint, this.previewBox, this.counterText]);
     this.updateMenuSelection();
   }
 
@@ -169,7 +274,6 @@ class WorldScene extends Phaser.Scene {
     if (!this.isIntro) return;
     this.isIntro = false;
 
-    // FIX: Using trailing slash and mode:cors for the 'up' call
     fetch('https://api.counterapi.dev/v1/accord_forsaken/global_v029/up/', { mode: 'cors' })
         .catch(() => {});
     
@@ -177,36 +281,72 @@ class WorldScene extends Phaser.Scene {
         this.bgm.play();
         this.tweens.add({ targets: this.bgm, volume: 0.6, duration: 2000 });
     }
-    this.tweens.add({ targets: this.menuGroup, alpha: 0, duration: 500, onComplete: () => this.menuGroup.destroy() });
+    
+    // Fade out all menu elements
+    this.tweens.add({ 
+      targets: this.menuElements, 
+      alpha: 0, 
+      duration: 500, 
+      onComplete: () => {
+        this.menuElements.forEach(el => el.destroy());
+        this.menuElements = [];
+        this.menuButtons = [];
+      }
+    });
+    
+    // Show mobile controls
+    this.mobileControlsGroup.setVisible(true);
   }
 
   update(time, delta) {
     if (this.hp <= 0 && !this.isDead) { this.triggerDeath(); return; }
+    
     if (this.isIntro) {
       if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
         this.selectedMenuIndex = (this.selectedMenuIndex - 1 + this.menuButtons.length) % this.menuButtons.length;
-        while(this.menuButtons[this.selectedMenuIndex].locked) { this.selectedMenuIndex = (this.selectedMenuIndex - 1 + this.menuButtons.length) % this.menuButtons.length; }
+        while(this.menuButtons[this.selectedMenuIndex].locked) { 
+          this.selectedMenuIndex = (this.selectedMenuIndex - 1 + this.menuButtons.length) % this.menuButtons.length; 
+        }
         this.updateMenuSelection();
       } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) {
         this.selectedMenuIndex = (this.selectedMenuIndex + 1) % this.menuButtons.length;
-        while(this.menuButtons[this.selectedMenuIndex].locked) { this.selectedMenuIndex = (this.selectedMenuIndex + 1) % this.menuButtons.length; }
+        while(this.menuButtons[this.selectedMenuIndex].locked) { 
+          this.selectedMenuIndex = (this.selectedMenuIndex + 1) % this.menuButtons.length; 
+        }
         this.updateMenuSelection();
       } else if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
         this.startGame();
       }
       return;
     }
-
+    
     if (this.isDead || this.hasEnded) return;
+    
     const body = this.player.body; 
 
-    let speed = 120; body.setVelocity(0);
+    let speed = 120; 
+    body.setVelocity(0);
+    
+    // Keyboard controls
     if (this.cursors.left.isDown) body.setVelocityX(-speed);
     else if (this.cursors.right.isDown) body.setVelocityX(speed);
     if (this.cursors.up.isDown) body.setVelocityY(-speed);
     else if (this.cursors.down.isDown) body.setVelocityY(speed);
 
-    this.isSilent = this.silenceKey.isDown && this.silence > 0;
+    // Mobile touch controls
+    if (this.touchMoving) {
+      const dx = this.touchX - 90; // 90 is the center of the movement zone
+      const dy = this.touchY - 560;
+      
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        const angle = Math.atan2(dy, dx);
+        body.setVelocityX(Math.cos(angle) * speed);
+        body.setVelocityY(Math.sin(angle) * speed);
+      }
+    }
+
+    // Silence mechanic (keyboard OR touch)
+    this.isSilent = (this.silenceKey.isDown || this.isTouchSilent) && this.silence > 0;
     if (this.isSilent) this.silence -= 18 * delta / 1000; else this.silence += 30 * delta / 1000;
     
     const tile = this.groundLayer.getTileAtWorldXY(this.player.x, this.player.y);
