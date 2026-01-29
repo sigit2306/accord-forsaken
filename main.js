@@ -61,6 +61,10 @@ class WorldScene extends Phaser.Scene {
     /* ---------------- AUDIO ---------------- */
     this.bgm = this.sound.add('bgm', { loop: true, volume: 0 });
     this.endBgm = this.sound.add('endBgm', { loop: false, volume: 0 });
+    this.isMusicMuted = false; // Track mute state
+
+    /* ---------------- MUSIC MUTE BUTTON (NEW) ---------------- */
+    this.setupMusicMuteButton();
 
     /* ---------------- MAP & PHYSICS ---------------- */
     const width = 23; const height = 75; const data = [];
@@ -116,6 +120,63 @@ class WorldScene extends Phaser.Scene {
     this.setupDifficultyMenu();
     this.cameras.main.setBounds(0, 0, 360, 1200); 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+  }
+
+  setupMusicMuteButton() {
+    // Music mute/unmute button in top-right corner
+    this.musicBtn = this.add.circle(340, 30, 18, 0xffffff, 0.3)
+      .setScrollFactor(0)
+      .setDepth(250)
+      .setInteractive({ useHandCursor: true });
+    
+    this.musicBtnText = this.add.text(340, 30, "♪", { 
+      fontSize: "18px", 
+      color: "#ffffff", 
+      fontStyle: "bold" 
+    })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(251);
+
+    // Toggle music on/off
+    this.musicBtn.on('pointerdown', () => {
+      this.isMusicMuted = !this.isMusicMuted;
+      
+      if (this.isMusicMuted) {
+        // Muted state
+        this.musicBtn.setFillStyle(0xff0000, 0.5);
+        this.musicBtnText.setText("🔇").setColor("#ff8888");
+        
+        // Mute all music
+        if (this.bgm && this.bgm.isPlaying) {
+          this.bgm.setVolume(0);
+        }
+        if (this.endBgm && this.endBgm.isPlaying) {
+          this.endBgm.setVolume(0);
+        }
+      } else {
+        // Unmuted state
+        this.musicBtn.setFillStyle(0xffffff, 0.3);
+        this.musicBtnText.setText("♪").setColor("#ffffff");
+        
+        // Restore music volume
+        if (this.bgm && this.bgm.isPlaying) {
+          this.tweens.add({ targets: this.bgm, volume: 0.6, duration: 300 });
+        }
+        if (this.endBgm && this.endBgm.isPlaying) {
+          this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 300 });
+        }
+      }
+    });
+
+    // Hover effect
+    this.musicBtn.on('pointerover', () => {
+      this.musicBtn.setScale(1.1);
+    });
+    
+    this.musicBtn.on('pointerout', () => {
+      this.musicBtn.setScale(1.0);
+    });
   }
 
   setupMobileControls() {
@@ -277,9 +338,14 @@ class WorldScene extends Phaser.Scene {
     fetch('https://api.counterapi.dev/v1/accord_forsaken/global_v029/up/', { mode: 'cors' })
         .catch(() => {});
     
-    if(this.bgm) {
+    // Only start music if not muted
+    if(this.bgm && !this.isMusicMuted) {
         this.bgm.play();
         this.tweens.add({ targets: this.bgm, volume: 0.6, duration: 2000 });
+    } else if(this.bgm && this.isMusicMuted) {
+        // Start but keep at volume 0
+        this.bgm.play();
+        this.bgm.setVolume(0);
     }
     
     // Fade out all menu elements
@@ -387,13 +453,20 @@ class WorldScene extends Phaser.Scene {
   triggerEnding() {
     this.hasEnded = true;
     this.player.body.setVelocity(0);
-    if (this.bgm) this.tweens.add({ targets: this.bgm, volume: 0, duration: 1500 });
+    if (this.bgm && !this.isMusicMuted) this.tweens.add({ targets: this.bgm, volume: 0, duration: 1500 });
     const overlay = this.add.rectangle(180, 320, 360, 640, 0x000000).setScrollFactor(0).setDepth(100).setAlpha(0);
     this.tweens.add({
         targets: overlay, alpha: 1, duration: 2000,
         onComplete: () => {
             if (this.bgm) this.bgm.stop();
-            if (this.endBgm) { this.endBgm.play(); this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 }); }
+            // Only play ending music if not muted
+            if (this.endBgm && !this.isMusicMuted) { 
+                this.endBgm.play(); 
+                this.tweens.add({ targets: this.endBgm, volume: 0.6, duration: 2000 }); 
+            } else if (this.endBgm && this.isMusicMuted) {
+                this.endBgm.play();
+                this.endBgm.setVolume(0);
+            }
             const creditText = "THE RUST REMEMBERS\n\nYou have crossed the sieve.\n\nThank you for playing the demo.\nChapter 14 [v0.2.9] by 3go\nMusic Copyright/Attribution:\nIn game music: Jan125\nCredit page: RandomMind";
             this.add.text(180, 280, creditText, { fontSize: "16px", color: "#ffffff", align: "center", wordWrap: { width: 300 } }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
             const btnBg = this.add.rectangle(180, 420, 120, 40, 0x333333).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
