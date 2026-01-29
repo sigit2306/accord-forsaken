@@ -186,12 +186,12 @@ class WorldScene extends Phaser.Scene {
     this.touchY = 0;
     
     // Silence button (right side) - TOGGLE MODE
-    const silenceBtn = this.add.circle(320, 560, 30, 0x88ccff, 0.3)
+    const silenceBtn = this.add.circle(320, 560, 30, 0x666666, 0.3)
       .setScrollFactor(0)
       .setDepth(15)
       .setInteractive();
     
-    this.silenceBtnText = this.add.text(320, 560, "S", { fontSize: "20px", color: "#ffffff", fontStyle: "bold" })
+    this.silenceBtnText = this.add.text(320, 560, "S", { fontSize: "20px", color: "#888888", fontStyle: "bold" })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(16);
@@ -202,11 +202,11 @@ class WorldScene extends Phaser.Scene {
     silenceBtn.on('pointerdown', () => {
       this.isTouchSilent = !this.isTouchSilent;
       if (this.isTouchSilent) {
-        silenceBtn.setAlpha(0.6);
         silenceBtn.setFillStyle(0x88ccff, 0.6);
+        this.silenceBtnText.setColor("#ffffff");
       } else {
-        silenceBtn.setAlpha(0.3);
-        silenceBtn.setFillStyle(0x88ccff, 0.3);
+        silenceBtn.setFillStyle(0x666666, 0.3);
+        this.silenceBtnText.setColor("#888888");
       }
     });
 
