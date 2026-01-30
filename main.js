@@ -25,6 +25,9 @@ class WorldScene extends Phaser.Scene {
   }
 
   create() {
+    // we need thisScene for QA purposes
+    const thisScene = this;
+
     // 1. HARD RESET: Prevents audio doubling and state freezes on restart
     this.sound.stopAll();
     this.sound.removeAll();
@@ -120,9 +123,36 @@ class WorldScene extends Phaser.Scene {
     this.setupDifficultyMenu();
     this.cameras.main.setBounds(0, 0, 360, 1200); 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+    // ===============================
+    // QA / Cypress test hooks
+    // ===============================
+    if (window.Cypress) {
+      window.__GAME__ = {
+        // Semantic state (stable for tests)
+        get musicMuted() {
+          return thisScene.isMusicMuted;
+        },
+
+        get musicButtonState() {
+          return thisScene.isMusicMuted ? 'muted' : 'unmuted';
+        },
+
+        // Test action
+        toggleMusic() {
+          if (thisScene.musicBtn) {
+            thisScene.musicBtn.emit('pointerdown');
+          }
+        }
+      };
+    }
+
   }
 
   setupMusicMuteButton() {
+    // we need thisScene for QA purposes / Cypress test hooks
+    // const thisScene = this;
+    
     // Music mute/unmute button in top-right corner
     this.musicBtn = this.add.circle(340, 30, 18, 0xffffff, 0.3)
       .setScrollFactor(0)
@@ -186,12 +216,12 @@ class WorldScene extends Phaser.Scene {
     this.touchY = 0;
     
     // Silence button (right side) - TOGGLE MODE
-    const silenceBtn = this.add.circle(320, 560, 30, 0x88ccff, 0.3)
+    const silenceBtn = this.add.circle(320, 560, 30, 0x666666, 0.3)
       .setScrollFactor(0)
       .setDepth(15)
       .setInteractive();
     
-    this.silenceBtnText = this.add.text(320, 560, "S", { fontSize: "20px", color: "#ffffff", fontStyle: "bold" })
+    this.silenceBtnText = this.add.text(320, 560, "S", { fontSize: "20px", color: "#888888", fontStyle: "bold" })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(16);
@@ -202,11 +232,11 @@ class WorldScene extends Phaser.Scene {
     silenceBtn.on('pointerdown', () => {
       this.isTouchSilent = !this.isTouchSilent;
       if (this.isTouchSilent) {
-        silenceBtn.setAlpha(0.6);
         silenceBtn.setFillStyle(0x88ccff, 0.6);
+        this.silenceBtnText.setColor("#ffffff");
       } else {
-        silenceBtn.setAlpha(0.3);
-        silenceBtn.setFillStyle(0x88ccff, 0.3);
+        silenceBtn.setFillStyle(0x666666, 0.3);
+        this.silenceBtnText.setColor("#888888");
       }
     });
 
