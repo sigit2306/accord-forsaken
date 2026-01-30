@@ -25,6 +25,9 @@ class WorldScene extends Phaser.Scene {
   }
 
   create() {
+    // we need thisScene for QA purposes
+    const thisScene = this;
+
     // 1. HARD RESET: Prevents audio doubling and state freezes on restart
     this.sound.stopAll();
     this.sound.removeAll();
@@ -120,9 +123,36 @@ class WorldScene extends Phaser.Scene {
     this.setupDifficultyMenu();
     this.cameras.main.setBounds(0, 0, 360, 1200); 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+    // ===============================
+    // QA / Cypress test hooks
+    // ===============================
+    if (window.Cypress) {
+      window.__GAME__ = {
+        // Semantic state (stable for tests)
+        get musicMuted() {
+          return thisScene.isMusicMuted;
+        },
+
+        get musicButtonState() {
+          return thisScene.isMusicMuted ? 'muted' : 'unmuted';
+        },
+
+        // Test action
+        toggleMusic() {
+          if (thisScene.musicBtn) {
+            thisScene.musicBtn.emit('pointerdown');
+          }
+        }
+      };
+    }
+
   }
 
   setupMusicMuteButton() {
+    // we need thisScene for QA purposes / Cypress test hooks
+    // const thisScene = this;
+    
     // Music mute/unmute button in top-right corner
     this.musicBtn = this.add.circle(340, 30, 18, 0xffffff, 0.3)
       .setScrollFactor(0)
